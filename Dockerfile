@@ -1,33 +1,22 @@
-# Etap pierwszy - budowa aplikacji webowej
-FROM node:14-alpine AS builder
+ARG BASE_VERSION=19
+FROM node:${BASE_VERSION}-alpine
 
-# Ustalamy wersję aplikacji poprzez zmienną ARG
-ARG VERSION
+ARG BASE_VERSION
+ENV APP_VERSION=${BASE_VERSION}
 
-# Ustawiamy katalog roboczy
-WORKDIR /app
+RUN apk add --update curl && \
+rm -rf /var/cache/apk/*
 
-# Kopiujemy pliki aplikacji do katalogu roboczego
-COPY . .
+WORKDIR /usr/app
 
-# Instalujemy zależności i budujemy aplikację
-RUN npm ci && npm run build
+COPY ./package.json ./
+RUN npm install
 
-# Etap drugi - konfiguracja Nginx
-FROM nginx:1.21-alpine
+COPY ./index.js ./
 
-# Kopiujemy pliki z etapu pierwszego do katalogu roboczego Nginx
-COPY --from=builder /app/build /usr/share/nginx/html
+EXPOSE 8080
 
-# Kopiujemy plik konfiguracyjny Nginx
-COPY nginx.conf /etc/nginx/nginx.conf
+HEALTHCHECK --interval=10s --timeout=1s \
+    CMD curl -f http://localhost:8080/ || exit 1
 
-# Ustawiamy polecenie HEALTHCHECK
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD wget -qO- http://localhost || exit 1
-
-# Ustawiamy etykietę z informacją o wersji aplikacji
-LABEL version=$VERSION
-
-# Uruchamiamy serwer Nginx w trybie daemon
-CMD ["nginx", "-g", "daemon off;"]
+CMD [ "npm", "start" ]
